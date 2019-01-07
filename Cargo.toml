@@ -1,0 +1,7 @@
+[package]
+name = "church_sound"
+version = "0.1.0"
+authors = ["Joe Tennies <joe@fatnsoft.com>"]
+
+[dependencies]
+gstreamer = "0.12.2"
