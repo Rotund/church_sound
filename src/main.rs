@@ -1,16 +1,56 @@
+extern crate gio;
 extern crate gstreamer as gst;
+extern crate gtk;
 
-use gst::GstObjectExt;
-use gst::ElementExt;
+use gio::prelude::*;
+use gst::prelude::*;
+use gtk::prelude::*;
+use gtk::{ApplicationWindow, Builder, };
 
-fn main()
-{
-    println!("Hello, world!");
+use std::env::args;
+
+fn build_ui(application: &gtk::Application) {
+    let glade_src = include_str!("main.glade");
+    let builder = Builder::new_from_string(glade_src);
+
+    let window: ApplicationWindow = builder.get_object("window")
+            .expect("Missing/corrupted Glade file");
+
+    window.set_application(application);
+
+    window.connect_delete_event(move |win, _| {
+        win.destroy();
+        Inhibit(false)
+    });
+
+    window.show_all();
+}
+
+fn main(){
+    let application = gtk::Application::new("org.middletonucc.church_sound",
+                                            gio::ApplicationFlags::empty())
+                                        .expect("GTK+ Initalization Failed...");
 
     // initialize GStreamer and exit if fail
     gst::init().unwrap();
+    
+    //let pipeline = gst::parse_launch(&"pulsesrc ! opusenc ! rtpopuspay ! udpsink port=12345").unwrap();
+    let pipeline = gst::parse_launch(&"wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
+         audioconvert mix-matrix=\"<<(float)1.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" !  \
+        audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! opusenc ! rtpopuspay ! udpsink port=12345").unwrap();
 
-    let pipeline = gst::parse_launch(&"pulsesrc ! opusenc ! rtpopuspay ! udpsink port=12345").unwrap();
+    application.connect_startup(move |app| {
+        build_ui(app);
+    });
+    application.connect_activate(|_| {});
+    application.run(&args().collect::<Vec<_>>());
+
+
+
 
     let ret = pipeline.set_state(gst::State::Playing);
     assert_ne!(ret, gst::StateChangeReturn::Failure);

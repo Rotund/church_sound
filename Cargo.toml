@@ -5,3 +5,8 @@ authors = ["Joe Tennies <joe@fatnsoft.com>"]
 
 [dependencies]
 gstreamer = "0.12.2"
+gio = "0.5.0"
+
+[dependencies.gtk]
+version = "0.5.0"
+features = ["v3_10"]
