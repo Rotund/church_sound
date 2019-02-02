@@ -1,9 +1,11 @@
 extern crate gio;
+extern crate glib;
 extern crate gstreamer as gst;
 extern crate gtk;
 
 use gio::prelude::*;
 use gst::prelude::*;
+use gst::{Element,};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, Builder, };
 
@@ -24,34 +26,58 @@ fn build_ui(application: &gtk::Application) {
     });
 
     window.show_all();
-}
 
-fn main(){
-    let application = gtk::Application::new("org.middletonucc.church_sound",
-                                            gio::ApplicationFlags::empty())
-                                        .expect("GTK+ Initalization Failed...");
-
-    // initialize GStreamer and exit if fail
-    gst::init().unwrap();
-    
-    //let pipeline = gst::parse_launch(&"pulsesrc ! opusenc ! rtpopuspay ! udpsink port=12345").unwrap();
-    let pipeline = gst::parse_launch(&"wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
+    /*
+    let pipeline_def = "wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
          audioconvert mix-matrix=\"<<(float)1.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
-        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" !  \
-        audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! opusenc ! rtpopuspay ! udpsink port=12345").unwrap();
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" ";
+    */
+    let mut pipeline_def: String = String::from("pulsesrc ");
+    pipeline_def.push_str("! audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! opusenc ! \
+        rtpopuspay ! udpsink port=12345");
+
+    let pipeline = gst::parse_launch(&pipeline_def).unwrap();
+    let pipeline_weak = pipeline.downgrade();
+
+
+
+    let timeout_id = gtk::timeout_add(100 /*ms*/, move || {
+        let pipeline = match pipeline_weak.upgrade() {
+            Some(pipeline) => pipeline,
+            None => return glib::Continue(true),
+        };
+
+        let ret = pipeline.set_state(gst::State::Playing);
+        //pipeline.get_state()
+        assert_ne!(ret, gst::StateChangeReturn::Failure);
+        glib::Continue(true)
+    });
+}
+
+fn main(){
+
+    // initialize GStreamer and GTK+ and exit if fail
+    gst::init().unwrap();
+    gtk::init().unwrap();
+
+    let application = gtk::Application::new("org.middletonucc.church_sound",
+                                            gio::ApplicationFlags::empty())
+                                        .expect("GTK+ Initalization Failed...");
+
 
     application.connect_startup(move |app| {
         build_ui(app);
     });
+
     application.connect_activate(|_| {});
     application.run(&args().collect::<Vec<_>>());
 
 
 
-
+/*
     let ret = pipeline.set_state(gst::State::Playing);
     assert_ne!(ret, gst::StateChangeReturn::Failure);
 
@@ -78,4 +104,5 @@ fn main(){
     }
     let ret = pipeline.set_state(gst::State::Null);
     assert_ne!(ret, gst::StateChangeReturn::Failure);
+*/
 }
