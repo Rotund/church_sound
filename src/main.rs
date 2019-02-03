@@ -5,7 +5,7 @@ extern crate gtk;
 
 use gio::prelude::*;
 use gst::prelude::*;
-use gst::{Element,};
+use gst::{Element,BinExt};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, Builder, };
 
@@ -17,6 +17,8 @@ fn build_ui(application: &gtk::Application) {
 
     let window: ApplicationWindow = builder.get_object("window")
             .expect("Missing/corrupted Glade file");
+
+    let btnRecord: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
 
     window.set_application(application);
 
@@ -36,25 +38,53 @@ fn build_ui(application: &gtk::Application) {
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" ";
     */
     let mut pipeline_def: String = String::from("pulsesrc ");
-    pipeline_def.push_str("! audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! opusenc ! \
-        rtpopuspay ! udpsink port=12345");
+    pipeline_def.push_str("! audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! level post-messages=TRUE ! tee name=t ");
+    // Streaming
+    pipeline_def.push_str("! queue ! opusenc ! rtpopuspay ! udpsink port=12345 ");
+    // Saving to file
+    pipeline_def.push_str("t. ! queue ! opusenc ! oggmux ! filesink location=out.opus");
+
+    //let pipeline_def = "pulsesrc ! level post-messages=TRUE ! fakesink sync=TRUE";
+
+    println!("{}", pipeline_def);
 
     let pipeline = gst::parse_launch(&pipeline_def).unwrap();
+    let bus = pipeline.get_bus().unwrap();
+
     let pipeline_weak = pipeline.downgrade();
-
-
-
-    let timeout_id = gtk::timeout_add(100 /*ms*/, move || {
+    bus.add_watch(move |_, msg| {
+        println!("GSTMessage");
         let pipeline = match pipeline_weak.upgrade() {
             Some(pipeline) => pipeline,
-            None => return glib::Continue(true),
+            None =>  return glib::Continue(true),
         };
+        println!("Woot!");
 
-        let ret = pipeline.set_state(gst::State::Playing);
-        //pipeline.get_state()
-        assert_ne!(ret, gst::StateChangeReturn::Failure);
         glib::Continue(true)
     });
+
+    let pipeline_weak = pipeline.downgrade();
+    btnRecord.connect_clicked(move |button| {
+        println!("Clicked!");
+        /*
+        let pipeline = match pipeline_weak.upgrade() {
+            Some(pipeline) => pipeline,
+            None =>  return,
+        };
+        */
+        println!("Pipeline not deleted!");
+        let ret = pipeline.set_state(gst::State::Playing);
+        assert_ne!(ret, gst::StateChangeReturn::Failure);
+    });
+
+    //let ev = gst::Event::new_eos().build();
+    //pipeline.send_event(ev);
+
+    //let level_weak = pipeline.get_by_name("level").unwrap().downgrade();
+
+
+    //let ret = pipeline.set_state(gst::State::Playing);
+    //assert_ne!(ret, gst::StateChangeReturn::Failure);
 }
 
 fn main(){
