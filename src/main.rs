@@ -19,6 +19,7 @@ fn build_ui(application: &gtk::Application) {
             .expect("Missing/corrupted Glade file");
 
     let btn_record: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
+    let bar_vu: gtk::GtkProgressBar = builder.get_object("barVUMeter1").expect("Couldn't find barVUMeter1");
 
     window.set_application(application);
 
@@ -55,12 +56,18 @@ fn build_ui(application: &gtk::Application) {
 
     let pipeline_weak = pipeline.downgrade();
     bus.add_watch(move |_, msg| {
-        println!("GSTMessage");
         let pipeline = match pipeline_weak.upgrade() {
             Some(pipeline) => pipeline,
             None =>  return glib::Continue(true),
         };
-        println!("Woot!");
+        let elem_msg = match msg.view() {
+            gst::MessageView::Element(elem) => elem,
+            _ => return glib::Continue(true),
+        };
+        if (elem_msg.get_structure().unwrap().get_name() == "level") {
+            bar_vu.
+            println!("Woot!");
+        }
 
         glib::Continue(true)
     });
