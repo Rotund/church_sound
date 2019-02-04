@@ -18,7 +18,7 @@ fn build_ui(application: &gtk::Application) {
     let window: ApplicationWindow = builder.get_object("window")
             .expect("Missing/corrupted Glade file");
 
-    let btnRecord: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
+    let btn_record: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
 
     window.set_application(application);
 
@@ -29,15 +29,17 @@ fn build_ui(application: &gtk::Application) {
 
     window.show_all();
 
-    /*
-    let pipeline_def = "wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
+    #[cfg(target_os = "windows")]
+    let mut pipeline_def = String::from("wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
          audioconvert mix-matrix=\"<<(float)1.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
         (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
-        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" ";
-    */
+        (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0>>\" ");
+
+    #[cfg(target_os = "linux")]
     let mut pipeline_def: String = String::from("pulsesrc ");
+
     pipeline_def.push_str("! audio/x-raw,channels=1 ! audioresample ! audio/x-raw,rate=48000 ! level post-messages=TRUE ! tee name=t ");
     // Streaming
     pipeline_def.push_str("! queue ! opusenc ! rtpopuspay ! udpsink port=12345 ");
@@ -64,7 +66,7 @@ fn build_ui(application: &gtk::Application) {
     });
 
     let pipeline_weak = pipeline.downgrade();
-    btnRecord.connect_clicked(move |button| {
+    btn_record.connect_clicked(move |button| {
         println!("Clicked!");
         /*
         let pipeline = match pipeline_weak.upgrade() {
