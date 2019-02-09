@@ -8,6 +8,7 @@ gstreamer = "0.12.2"
 gio = "0.5.1"
 glib = "0.6.1"
 num = "0.2.0"
+chrono = "0.4.6"
 
 [dependencies.gtk]
 version = "0.5.0"

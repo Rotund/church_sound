@@ -1,9 +1,11 @@
+extern crate chrono;
 extern crate gio;
 extern crate glib;
 extern crate gstreamer as gst;
 extern crate gtk;
 extern crate num;
 
+use chrono::prelude::*;
 use gio::prelude::*;
 use gst::prelude::*;
 use gtk::prelude::*;
@@ -33,6 +35,9 @@ fn build_ui(application: &gtk::Application) {
 
     window.show_all();
 
+    let dt = Local::now();
+    let dt_str = dt.format("%Y%m%d%H%M%S").to_string();
+
     #[cfg(target_os = "windows")]
     let mut pipeline_def = String::from("wasapisrc low-latency=true ! audio/x-raw,rate=96000,channels=32 ! \
          audioconvert mix-matrix=\"<<(float)1.0, (float)0.0, (float)0.0, (float)0.0, (float)0.0,  \
@@ -48,7 +53,7 @@ fn build_ui(application: &gtk::Application) {
     // Streaming
     pipeline_def.push_str("! queue ! opusenc ! rtpopuspay ! udpsink port=12345 ");
     // Saving to file
-    pipeline_def.push_str("t. ! queue ! opusenc ! oggmux ! filesink location=\"f:/recording.opus\"");
+    pipeline_def.push_str(&format!("t. ! queue ! opusenc ! oggmux ! filesink location=\"f:/recording-{}.opus\"", dt_str));
 
     println!("{}", pipeline_def);
 
