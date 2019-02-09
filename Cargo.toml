@@ -7,6 +7,7 @@ authors = ["Joe Tennies <joe@fatnsoft.com>"]
 gstreamer = "0.12.2"
 gio = "0.5.1"
 glib = "0.6.1"
+num = "0.2.0"
 
 [dependencies.gtk]
 version = "0.5.0"

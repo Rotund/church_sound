@@ -2,14 +2,15 @@ extern crate gio;
 extern crate glib;
 extern crate gstreamer as gst;
 extern crate gtk;
+extern crate num;
 
 use gio::prelude::*;
 use gst::prelude::*;
-use gst::{Element,BinExt};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, Builder, };
 
 use std::env::args;
+use std::sync::{Arc, Mutex};
 
 fn build_ui(application: &gtk::Application) {
     let glade_src = include_str!("main.glade");
@@ -19,7 +20,10 @@ fn build_ui(application: &gtk::Application) {
             .expect("Missing/corrupted Glade file");
 
     let btn_record: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
-    let bar_vu: gtk::GtkProgressBar = builder.get_object("barVUMeter1").expect("Couldn't find barVUMeter1");
+    let bar_vu: gtk::ProgressBar = builder.get_object("barVUMeter1").expect("Couldn't find barVUMeter1");
+    let bar_vu_weak = bar_vu.downgrade();
+    let vu_db = Arc::new(Mutex::new(0.0));
+    let vu_db_read = vu_db.clone();
 
     window.set_application(application);
 
@@ -47,8 +51,6 @@ fn build_ui(application: &gtk::Application) {
     // Saving to file
     pipeline_def.push_str("t. ! queue ! opusenc ! oggmux ! filesink location=out.opus");
 
-    //let pipeline_def = "pulsesrc ! level post-messages=TRUE ! fakesink sync=TRUE";
-
     println!("{}", pipeline_def);
 
     let pipeline = gst::parse_launch(&pipeline_def).unwrap();
@@ -64,9 +66,9 @@ fn build_ui(application: &gtk::Application) {
             gst::MessageView::Element(elem) => elem,
             _ => return glib::Continue(true),
         };
-        if (elem_msg.get_structure().unwrap().get_name() == "level") {
-            bar_vu.
-            println!("Woot!");
+        let elem_st = elem_msg.get_structure().unwrap();
+        if elem_st.get_name() == "level" {
+            *vu_db.lock().unwrap() = elem_st.get_value("rms").unwrap().get::<glib::ValueArray>().unwrap()[0].get::<f64>().unwrap();
         }
 
         glib::Continue(true)
@@ -75,16 +77,22 @@ fn build_ui(application: &gtk::Application) {
     let pipeline_weak = pipeline.downgrade();
     btn_record.connect_clicked(move |button| {
         println!("Clicked!");
-        /*
         let pipeline = match pipeline_weak.upgrade() {
             Some(pipeline) => pipeline,
             None =>  return,
         };
-        */
         println!("Pipeline not deleted!");
         let ret = pipeline.set_state(gst::State::Playing);
         assert_ne!(ret, gst::StateChangeReturn::Failure);
     });
+
+    let timeout_id = gtk::timeout_add(100, move || {
+        let rms: f64 = *vu_db_read.lock().unwrap();
+        bar_vu.set_fraction(num::clamp((rms+60.0)/60.0, 0.0, 1.0));
+        glib::Continue(true)
+    });
+
+
 
     //let ev = gst::Event::new_eos().build();
     //pipeline.send_event(ev);
@@ -94,6 +102,12 @@ fn build_ui(application: &gtk::Application) {
 
     //let ret = pipeline.set_state(gst::State::Playing);
     //assert_ne!(ret, gst::StateChangeReturn::Failure);
+
+    // shutdown owns the pipeline
+    application.connect_shutdown(move |_| {
+        let ret = pipeline.set_state(gst::State::Null);
+        assert_ne!(ret, gst::StateChangeReturn::Failure);
+    });
 }
 
 fn main(){
