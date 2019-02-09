@@ -21,7 +21,6 @@ fn build_ui(application: &gtk::Application) {
 
     let btn_record: gtk::Button = builder.get_object("btnRecord1").expect("Couldn't find btnRecord1");
     let bar_vu: gtk::ProgressBar = builder.get_object("barVUMeter1").expect("Couldn't find barVUMeter1");
-    let bar_vu_weak = bar_vu.downgrade();
     let vu_db = Arc::new(Mutex::new(0.0));
     let vu_db_read = vu_db.clone();
 
@@ -49,7 +48,7 @@ fn build_ui(application: &gtk::Application) {
     // Streaming
     pipeline_def.push_str("! queue ! opusenc ! rtpopuspay ! udpsink port=12345 ");
     // Saving to file
-    pipeline_def.push_str("t. ! queue ! opusenc ! oggmux ! filesink location=out.opus");
+    pipeline_def.push_str("t. ! queue ! opusenc ! oggmux ! filesink location=\"f:/recording.opus\"");
 
     println!("{}", pipeline_def);
 
@@ -58,10 +57,6 @@ fn build_ui(application: &gtk::Application) {
 
     let pipeline_weak = pipeline.downgrade();
     bus.add_watch(move |_, msg| {
-        let pipeline = match pipeline_weak.upgrade() {
-            Some(pipeline) => pipeline,
-            None =>  return glib::Continue(true),
-        };
         let elem_msg = match msg.view() {
             gst::MessageView::Element(elem) => elem,
             _ => return glib::Continue(true),
@@ -76,14 +71,13 @@ fn build_ui(application: &gtk::Application) {
 
     let pipeline_weak = pipeline.downgrade();
     btn_record.connect_clicked(move |button| {
-        println!("Clicked!");
         let pipeline = match pipeline_weak.upgrade() {
             Some(pipeline) => pipeline,
             None =>  return,
         };
-        println!("Pipeline not deleted!");
         let ret = pipeline.set_state(gst::State::Playing);
         assert_ne!(ret, gst::StateChangeReturn::Failure);
+        button.set_sensitive(false);
     });
 
     let timeout_id = gtk::timeout_add(100, move || {
